@@ -5,6 +5,7 @@ import json
 import musixmatch
 from musixmatch import *
 from artist import * 
+from os import path
 
 def main():
     stop_file = open('stopwords.txt')
@@ -26,9 +27,6 @@ def main():
         print key, " : ",  wordCount[key]
    
 def parse_musix_url(artistId):
-#snoop dogg - 106
-#bob marley - 140038
-#50 cent - 8347
     apikey = 'aea7c70a32c3b8d56a07c99ef9d56ffa'
     artists = musixmatch.ws.artist.albums.get(artist_id=artistId, apikey=apikey)
     albums = []
@@ -48,10 +46,22 @@ def parse_musix_url(artistId):
         if lyric["header"]["status_code"] == 200:
             # print lyric["body"]["lyrics"]["lyrics_body"]
             lyrics.append(lyric["body"]["lyrics"]["lyrics_body"])   
-    return lyrics
+    if len(lyrics) > 0:
+        return str(lyrics[0])
+    else:
+        return ''
 
 def getLyricsForArtist(artist):
-    lyrics = parse_musix_url(artist.id)
+    lyricsFile = r"lyrics\lyrics_" + artist.alias() + ".txt"
+    if(path.exists(lyricsFile)):
+        print 'reading from local file'
+        f = open(lyricsFile, 'r')
+        lyrics = f.read()
+        f.close()
+    else:
+        print 'reading from the web'
+        lyrics = str(parse_musix_url(artist.id)[0])
+    #print "lyrics are :\n" , lyrics
     return lyrics
 
 def getArtists():
@@ -59,11 +69,41 @@ def getArtists():
     artists = []
     for info in artist_file.readlines():
         artists.append( Artist(int(info.split(':')[0]), info.split(':')[1]))
+    artist_file.close()
     return artists
+
+def tokenize(sentence):
+    lyrics_words = re.findall('[^. \n\r\\n]+', sentence)
+    lyrics_words = [word.lower() for word in lyrics_words]
+    # print "All words : ", lyrics_words
+    return lyrics_words
+    
+def removeStopWords(words):    
+    stop_file = open('stopwords.txt')
+    stop_words = stop_file.read().split("\n")
+    wordSet = list(set(words) - set(stop_words))
+    # print "filtered words", wordSet
+    return wordSet
+
+def getWordCounts(words, wordSet):    
+    wordCount = defaultdict(int)
+    for word in wordSet:
+        wordCount[word] += words.count(word)
+    return wordCount
+
+def getWordCountsForArtist(artist):
+    lyrics = getLyricsForArtist(artist)
+    words = tokenize(lyrics)
+    filteredWords = removeStopWords(words)
+    return getWordCounts(words, filteredWords)
     
 if __name__ == "__main__":
-    print getLyricsForArtist(getArtists()[7])
+    print getWordCountsForArtist(Artist(437407,"LMFAO"))
+    # print getLyricsForArtist(getArtists()[7])
     # for artist in getArtists():
-        # getLyricsForArtist(artist)
-    
+        # lyrics = getLyricsForArtist(artist)
+        # filepath=r'lyrics\lyrics_' + artist.alias() + '.txt'
+        # lyrics_file = open(filepath, 'w')
+        # lyrics_file.write(str(lyrics))
+    # lyrics_file.close()
     #main()
